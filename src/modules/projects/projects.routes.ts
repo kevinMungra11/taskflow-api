@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { currentUser, requireAuth } from '../../middleware/auth.js';
 import { paginationSchema } from '../../utils/pagination.js';
+import { listActivity } from '../activity/activity.service.js';
 import * as projectsService from './projects.service.js';
 
 export const projectsRouter = Router();
@@ -30,6 +31,16 @@ projectsRouter.get('/', async (req, res) => {
 projectsRouter.get('/:projectId', async (req, res) => {
   const project = await projectsService.getProject(req.params.projectId, currentUser(req).id);
   res.json({ project });
+});
+
+projectsRouter.get('/:projectId/stats', async (req, res) => {
+  const stats = await projectsService.getProjectStats(req.params.projectId, currentUser(req).id);
+  res.json({ stats });
+});
+
+projectsRouter.get('/:projectId/activity', async (req, res) => {
+  const pagination = paginationSchema.parse(req.query);
+  res.json(await listActivity(req.params.projectId, currentUser(req).id, pagination));
 });
 
 projectsRouter.get('/:projectId/members', async (req, res) => {
