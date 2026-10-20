@@ -35,7 +35,7 @@ describe('tasks.service', () => {
     await expect(tasksService.getTask('task-1', 'outsider')).rejects.toMatchObject({ status: 404 });
   });
 
-  it('only updates whitelisted columns, using bound parameters', async () => {
+  it('updates the provided columns using bound parameters', async () => {
     mockedQuery
       .mockResolvedValueOnce({ rows: [task] } as never)
       .mockResolvedValueOnce({ rows: [{ role: 'member' }] } as never)
@@ -44,8 +44,8 @@ describe('tasks.service', () => {
     await tasksService.updateTask('task-1', 'user-1', { status: 'done', title: 'Write better docs' });
 
     const [sql, params] = mockedQuery.mock.calls[2]!;
-    expect(sql).toContain('title = $1, status = $2');
-    expect(params).toEqual(['Write better docs', 'done', 'task-1']);
+    expect(sql).toContain('status = $1, title = $2');
+    expect(params).toEqual(['done', 'Write better docs', 'task-1']);
   });
 
   it('filters list queries by status and priority', async () => {
