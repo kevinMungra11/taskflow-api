@@ -39,7 +39,8 @@ describe('tasks.service', () => {
     mockedQuery
       .mockResolvedValueOnce({ rows: [task] } as never)
       .mockResolvedValueOnce({ rows: [{ role: 'member' }] } as never)
-      .mockResolvedValueOnce({ rows: [{ ...task, status: 'done' }] } as never);
+      .mockResolvedValueOnce({ rows: [{ ...task, status: 'done' }] } as never)
+      .mockResolvedValueOnce({ rows: [] } as never); // activity
 
     await tasksService.updateTask('task-1', 'user-1', { status: 'done', title: 'Write better docs' });
 
@@ -65,5 +66,29 @@ describe('tasks.service', () => {
     expect(sql).toContain('status = $2 AND priority = $3');
     expect(params).toEqual(['project-1', 'todo', 'high', 10, 10]);
     expect(page).toMatchObject({ total: 1, page: 2, totalPages: 1 });
+  });
+});
+
+describe('tasks.service createTask', () => {
+  beforeEach(() => {
+    mockedQuery.mockReset();
+  });
+
+  it('assigns the next per-project number and records activity', async () => {
+    mockedQuery
+      .mockResolvedValueOnce({ rows: [{ role: 'member' }] } as never)
+      .mockResolvedValueOnce({ rows: [{ number: 4 }] } as never)
+      .mockResolvedValueOnce({ rows: [{ ...task, number: 4 }] } as never)
+      .mockResolvedValueOnce({ rows: [] } as never);
+
+    const created = await tasksService.createTask('project-1', 'user-1', {
+      title: 'Write docs',
+      status: 'todo',
+      priority: 'medium',
+    });
+
+    expect(created.number).toBe(4);
+    expect(mockedQuery.mock.calls[2]?.[1]?.[1]).toBe(4);
+    expect(mockedQuery.mock.calls[3]?.[0]).toContain('INSERT INTO activity_events');
   });
 });

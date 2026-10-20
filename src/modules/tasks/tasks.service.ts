@@ -1,12 +1,14 @@
 import { query } from '../../db/pool.js';
 import { notFound } from '../../utils/errors.js';
 import { toLimitOffset, toPage, type Page } from '../../utils/pagination.js';
+import { recordActivity } from '../activity/activity.service.js';
 import { assertProjectMember } from '../projects/projects.service.js';
 import type { CreateTaskInput, ListTasksQuery, TaskPriority, TaskStatus, UpdateTaskInput } from './tasks.schemas.js';
 
 export interface Task {
   id: string;
   project_id: string;
+  number: number;
   title: string;
   description: string | null;
   status: TaskStatus;
@@ -18,20 +20,37 @@ export interface Task {
 }
 
 const TASK_COLUMNS =
-  'id, project_id, title, description, status, priority, due_date, created_by, created_at, updated_at';
+  'id, project_id, number, title, description, status, priority, due_date, created_by, created_at, updated_at';
 
 const UPDATABLE_FIELDS = ['title', 'description', 'status', 'priority', 'due_date'] as const;
 
 export async function createTask(projectId: string, userId: string, input: CreateTaskInput): Promise<Task> {
   await assertProjectMember(projectId, userId);
 
-  const { rows } = await query<Task>(
-    `INSERT INTO tasks (project_id, title, description, status, priority, due_date, created_by)
-     VALUES ($1, $2, $3, $4, $5, $6, $7)
-     RETURNING ${TASK_COLUMNS}`,
-    [projectId, input.title, input.description ?? null, input.status, input.priority, input.due_date ?? null, userId],
+  const next = await query<{ number: number }>(
+    'SELECT COALESCE(MAX(number), 0) + 1 AS number FROM tasks WHERE project_id = $1',
+    [projectId],
   );
-  return rows[0]!;
+
+  const { rows } = await query<Task>(
+    `INSERT INTO tasks (project_id, number, title, description, status, priority, due_date, created_by)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+     RETURNING ${TASK_COLUMNS}`,
+    [
+      projectId,
+      next.rows[0]!.number,
+      input.title,
+      input.description ?? null,
+      input.status,
+      input.priority,
+      input.due_date ?? null,
+      userId,
+    ],
+  );
+  const task = rows[0]!;
+
+  await recordActivity({ projectId, actorId: userId, type: 'task_created', taskId: task.id, payload: { title: task.title } });
+  return task;
 }
 
 export async function listTasks(projectId: string, userId: string, filters: ListTasksQuery): Promise<Page<Task>> {
@@ -101,10 +120,19 @@ export async function updateTask(taskId: string, userId: string, input: UpdateTa
   );
   const task = rows[0];
   if (!task) throw notFound('Task not found');
+
+  await recordActivity({
+    projectId: task.project_id,
+    actorId: userId,
+    type: 'task_updated',
+    taskId: task.id,
+    payload: { changes: input },
+  });
   return task;
 }
 
 export async function deleteTask(taskId: string, userId: string): Promise<void> {
-  await getTask(taskId, userId);
+  const task = await getTask(taskId, userId);
   await query('UPDATE tasks SET deleted_at = now() WHERE id = $1 AND deleted_at IS NULL', [taskId]);
+  await recordActivity({ projectId: task.project_id, actorId: userId, type: 'task_deleted', taskId });
 }

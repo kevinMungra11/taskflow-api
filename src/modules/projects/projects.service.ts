@@ -137,3 +137,39 @@ export async function removeMember(projectId: string, actorId: string, memberId:
 
   await query('DELETE FROM project_members WHERE project_id = $1 AND user_id = $2', [projectId, memberId]);
 }
+
+export interface ProjectStats {
+  total: number;
+  byStatus: Record<'todo' | 'in_progress' | 'done', number>;
+  overdue: number;
+  completionRate: number;
+}
+
+export async function getProjectStats(projectId: string, userId: string): Promise<ProjectStats> {
+  await assertProjectMember(projectId, userId);
+
+  const { rows } = await query<{ status: 'todo' | 'in_progress' | 'done'; count: string; overdue: string }>(
+    `SELECT status,
+            count(*) AS count,
+            count(*) FILTER (WHERE due_date < CURRENT_DATE AND status <> 'done') AS overdue
+     FROM tasks
+     WHERE project_id = $1
+     GROUP BY status`,
+    [projectId],
+  );
+
+  const byStatus = { todo: 0, in_progress: 0, done: 0 };
+  let overdue = 0;
+  for (const row of rows) {
+    byStatus[row.status] = Number(row.count);
+    overdue += Number(row.overdue);
+  }
+  const total = byStatus.todo + byStatus.in_progress + byStatus.done;
+
+  return {
+    total,
+    byStatus,
+    overdue,
+    completionRate: Math.round((byStatus.done / total) * 100),
+  };
+}

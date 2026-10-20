@@ -37,6 +37,8 @@ All endpoints except `/health` and `/auth/*` need an `Authorization: Bearer <tok
 | POST   | `/projects`                            | Create a project (you're owner)   |
 | GET    | `/projects`                            | Projects you belong to            |
 | GET    | `/projects/:projectId`                 | Project details                   |
+| GET    | `/projects/:projectId/stats`           | Task counts, overdue, completion  |
+| GET    | `/projects/:projectId/activity`        | Activity feed (paginated)         |
 | GET    | `/projects/:projectId/members`         | List members                      |
 | POST   | `/projects/:projectId/members`         | Add a member by email (owner)     |
 | DELETE | `/projects/:projectId/members/:userId` | Remove a member (owner)           |
