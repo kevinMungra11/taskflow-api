@@ -44,7 +44,11 @@ All endpoints except `/health` and `/auth/*` need an `Authorization: Bearer <tok
 | GET    | `/projects/:projectId/tasks`           | List tasks (`status`, `priority`, `page`, `pageSize`) |
 | GET    | `/tasks/:taskId`                       | Task details                      |
 | PATCH  | `/tasks/:taskId`                       | Update a task                     |
+| PUT    | `/tasks/:taskId/assignee`              | Assign / unassign (`assignee_id`) |
 | DELETE | `/tasks/:taskId`                       | Soft-delete a task                |
+| GET    | `/users/me/tasks`                      | Tasks assigned to you             |
+| GET    | `/notifications`                       | Your notifications (`unread=true`)|
+| POST   | `/notifications/:id/read`              | Mark a notification as read       |
 
 List endpoints return `{ items, page, pageSize, total, totalPages }`.
 

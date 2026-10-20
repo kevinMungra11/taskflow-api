@@ -1,6 +1,7 @@
 import express from 'express';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
 import { authRouter } from './modules/auth/auth.routes.js';
+import { notificationsRouter } from './modules/notifications/notifications.routes.js';
 import { projectsRouter } from './modules/projects/projects.routes.js';
 import { projectTasksRouter, tasksRouter } from './modules/tasks/tasks.routes.js';
 import { usersRouter } from './modules/users/users.routes.js';
@@ -20,6 +21,7 @@ export function createApp() {
   app.use('/projects', projectsRouter);
   app.use('/projects/:projectId/tasks', projectTasksRouter);
   app.use('/tasks', tasksRouter);
+  app.use('/notifications', notificationsRouter);
 
   app.use(notFoundHandler);
   app.use(errorHandler);

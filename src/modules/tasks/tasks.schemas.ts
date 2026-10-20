@@ -28,6 +28,10 @@ export const updateTaskSchema = z
   .partial()
   .refine((value) => Object.keys(value).length > 0, { message: 'At least one field is required' });
 
+export const assignTaskSchema = z.object({
+  assignee_id: z.string().uuid().nullable(),
+});
+
 export const listTasksQuerySchema = paginationSchema.extend({
   status: taskStatusSchema.optional(),
   priority: taskPrioritySchema.optional(),
@@ -35,4 +39,5 @@ export const listTasksQuerySchema = paginationSchema.extend({
 
 export type CreateTaskInput = z.infer<typeof createTaskSchema>;
 export type UpdateTaskInput = z.infer<typeof updateTaskSchema>;
+export type AssignTaskInput = z.infer<typeof assignTaskSchema>;
 export type ListTasksQuery = z.infer<typeof listTasksQuerySchema>;

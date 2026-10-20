@@ -1,7 +1,9 @@
 import { query } from '../../db/pool.js';
 import { notFound } from '../../utils/errors.js';
-import { toLimitOffset, toPage, type Page } from '../../utils/pagination.js';
+import { toLimitOffset, toPage, type Page, type Pagination } from '../../utils/pagination.js';
+import { createNotification } from '../notifications/notifications.service.js';
 import { assertProjectMember } from '../projects/projects.service.js';
+import { getUserById } from '../users/users.service.js';
 import type { CreateTaskInput, ListTasksQuery, TaskPriority, TaskStatus, UpdateTaskInput } from './tasks.schemas.js';
 
 export interface Task {
@@ -13,12 +15,17 @@ export interface Task {
   priority: TaskPriority;
   due_date: string | null;
   created_by: string;
+  assignee_id: string | null;
   created_at: Date;
   updated_at: Date;
 }
 
 const TASK_COLUMNS =
-  'id, project_id, title, description, status, priority, due_date, created_by, created_at, updated_at';
+  'id, project_id, title, description, status, priority, due_date, created_by, assignee_id, created_at, updated_at';
+
+export interface AssignedTask extends Task {
+  project_name: string;
+}
 
 const UPDATABLE_FIELDS = ['title', 'description', 'status', 'priority', 'due_date'] as const;
 
@@ -107,4 +114,58 @@ export async function updateTask(taskId: string, userId: string, input: UpdateTa
 export async function deleteTask(taskId: string, userId: string): Promise<void> {
   await getTask(taskId, userId);
   await query('UPDATE tasks SET deleted_at = now() WHERE id = $1 AND deleted_at IS NULL', [taskId]);
+}
+
+export async function assignTask(taskId: string, actorId: string, assigneeId: string | null): Promise<Task> {
+  const task = await getTask(taskId, actorId);
+
+  if (assigneeId) {
+    // Make sure the assignee exists before we write the FK.
+    await getUserById(assigneeId);
+  }
+
+  const { rows } = await query<Task>(
+    `UPDATE tasks SET assignee_id = $1, updated_at = now()
+     WHERE id = $2 AND deleted_at IS NULL
+     RETURNING ${TASK_COLUMNS}`,
+    [assigneeId, taskId],
+  );
+  const updated = rows[0];
+  if (!updated) throw notFound('Task not found');
+
+  if (assigneeId && assigneeId !== actorId && assigneeId !== task.assignee_id) {
+    createNotification(assigneeId, 'task_assigned', {
+      taskId: updated.id,
+      taskTitle: updated.title,
+      projectId: updated.project_id,
+      assignedBy: actorId,
+    });
+  }
+
+  return updated;
+}
+
+export async function listAssignedTasks(userId: string, pagination: Pagination): Promise<Page<AssignedTask>> {
+  const { limit, offset } = toLimitOffset(pagination);
+
+  const [list, count] = await Promise.all([
+    query<Task>(
+      `SELECT ${TASK_COLUMNS} FROM tasks
+       WHERE assignee_id = $1 AND deleted_at IS NULL
+       ORDER BY due_date ASC NULLS LAST, created_at DESC
+       LIMIT $2 OFFSET $3`,
+      [userId, limit, offset],
+    ),
+    query<{ total: string }>('SELECT count(*) AS total FROM tasks WHERE assignee_id = $1 AND deleted_at IS NULL', [
+      userId,
+    ]),
+  ]);
+
+  const items: AssignedTask[] = [];
+  for (const task of list.rows) {
+    const { rows } = await query<{ name: string }>('SELECT name FROM projects WHERE id = $1', [task.project_id]);
+    items.push({ ...task, project_name: rows[0]?.name ?? '' });
+  }
+
+  return toPage(items, Number(count.rows[0]?.total ?? 0), pagination);
 }

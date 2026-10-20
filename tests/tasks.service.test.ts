@@ -67,3 +67,35 @@ describe('tasks.service', () => {
     expect(page).toMatchObject({ total: 1, page: 2, totalPages: 1 });
   });
 });
+
+describe('tasks.service assignment', () => {
+  beforeEach(() => {
+    mockedQuery.mockReset();
+  });
+
+  it('assigns a task and returns the updated row', async () => {
+    mockedQuery
+      .mockResolvedValueOnce({ rows: [{ ...task, assignee_id: null }] } as never) // task lookup
+      .mockResolvedValueOnce({ rows: [{ role: 'member' }] } as never) // actor membership
+      .mockResolvedValueOnce({ rows: [{ id: 'user-2', email: 'b@example.com', name: 'B' }] } as never) // assignee
+      .mockResolvedValueOnce({ rows: [{ ...task, assignee_id: 'user-2' }] } as never) // update
+      .mockResolvedValueOnce({ rows: [{ id: 'n-1' }] } as never); // notification
+
+    const updated = await tasksService.assignTask('task-1', 'user-1', 'user-2');
+
+    expect(updated.assignee_id).toBe('user-2');
+    expect(mockedQuery.mock.calls[3]?.[1]).toEqual(['user-2', 'task-1']);
+  });
+
+  it('can unassign a task', async () => {
+    mockedQuery
+      .mockResolvedValueOnce({ rows: [{ ...task, assignee_id: 'user-2' }] } as never)
+      .mockResolvedValueOnce({ rows: [{ role: 'member' }] } as never)
+      .mockResolvedValueOnce({ rows: [{ ...task, assignee_id: null }] } as never);
+
+    const updated = await tasksService.assignTask('task-1', 'user-1', null);
+
+    expect(updated.assignee_id).toBeNull();
+    expect(mockedQuery).toHaveBeenCalledTimes(3);
+  });
+});

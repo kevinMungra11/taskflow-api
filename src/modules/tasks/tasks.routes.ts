@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { currentUser, requireAuth } from '../../middleware/auth.js';
-import { createTaskSchema, listTasksQuerySchema, updateTaskSchema } from './tasks.schemas.js';
+import { assignTaskSchema, createTaskSchema, listTasksQuerySchema, updateTaskSchema } from './tasks.schemas.js';
 import * as tasksService from './tasks.service.js';
 
 /** Routes nested under /projects/:projectId/tasks */
@@ -32,6 +32,12 @@ tasksRouter.get('/:taskId', async (req, res) => {
 tasksRouter.patch('/:taskId', async (req, res) => {
   const input = updateTaskSchema.parse(req.body);
   const task = await tasksService.updateTask(req.params.taskId, currentUser(req).id, input);
+  res.json({ task });
+});
+
+tasksRouter.put('/:taskId/assignee', async (req, res) => {
+  const { assignee_id } = assignTaskSchema.parse(req.body);
+  const task = await tasksService.assignTask(req.params.taskId, currentUser(req).id, assignee_id);
   res.json({ task });
 });
 
