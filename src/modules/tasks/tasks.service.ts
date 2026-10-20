@@ -2,8 +2,7 @@ import { query } from '../../db/pool.js';
 import { notFound } from '../../utils/errors.js';
 import { toLimitOffset, toPage, type Page, type Pagination } from '../../utils/pagination.js';
 import { createNotification } from '../notifications/notifications.service.js';
-import { assertProjectMember } from '../projects/projects.service.js';
-import { getUserById } from '../users/users.service.js';
+import { assertProjectMember, isProjectMember } from '../projects/projects.service.js';
 import type { CreateTaskInput, ListTasksQuery, TaskPriority, TaskStatus, UpdateTaskInput } from './tasks.schemas.js';
 
 export interface Task {
@@ -119,9 +118,8 @@ export async function deleteTask(taskId: string, userId: string): Promise<void> 
 export async function assignTask(taskId: string, actorId: string, assigneeId: string | null): Promise<Task> {
   const task = await getTask(taskId, actorId);
 
-  if (assigneeId) {
-    // Make sure the assignee exists before we write the FK.
-    await getUserById(assigneeId);
+  if (assigneeId && !(await isProjectMember(task.project_id, assigneeId))) {
+    throw notFound('Assignee is not a member of this project');
   }
 
   const { rows } = await query<Task>(
@@ -139,6 +137,8 @@ export async function assignTask(taskId: string, actorId: string, assigneeId: st
       taskTitle: updated.title,
       projectId: updated.project_id,
       assignedBy: actorId,
+    }).catch((err) => {
+      console.error('Failed to create task_assigned notification', err);
     });
   }
 

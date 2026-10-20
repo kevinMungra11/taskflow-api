@@ -77,7 +77,7 @@ describe('tasks.service assignment', () => {
     mockedQuery
       .mockResolvedValueOnce({ rows: [{ ...task, assignee_id: null }] } as never) // task lookup
       .mockResolvedValueOnce({ rows: [{ role: 'member' }] } as never) // actor membership
-      .mockResolvedValueOnce({ rows: [{ id: 'user-2', email: 'b@example.com', name: 'B' }] } as never) // assignee
+      .mockResolvedValueOnce({ rows: [{ role: 'member' }] } as never) // assignee membership
       .mockResolvedValueOnce({ rows: [{ ...task, assignee_id: 'user-2' }] } as never) // update
       .mockResolvedValueOnce({ rows: [{ id: 'n-1' }] } as never); // notification
 
@@ -96,6 +96,16 @@ describe('tasks.service assignment', () => {
     const updated = await tasksService.assignTask('task-1', 'user-1', null);
 
     expect(updated.assignee_id).toBeNull();
+    expect(mockedQuery).toHaveBeenCalledTimes(3);
+  });
+
+  it('rejects an assignee who is not a project member', async () => {
+    mockedQuery
+      .mockResolvedValueOnce({ rows: [{ ...task, assignee_id: null }] } as never)
+      .mockResolvedValueOnce({ rows: [{ role: 'member' }] } as never)
+      .mockResolvedValueOnce({ rows: [] } as never); // assignee not a member
+
+    await expect(tasksService.assignTask('task-1', 'user-1', 'outsider')).rejects.toMatchObject({ status: 404 });
     expect(mockedQuery).toHaveBeenCalledTimes(3);
   });
 });

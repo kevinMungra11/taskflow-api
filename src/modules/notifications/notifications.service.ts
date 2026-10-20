@@ -50,12 +50,12 @@ export async function listNotifications(
   return toPage(list.rows, Number(count.rows[0]?.total ?? 0), pagination);
 }
 
-export async function markAsRead(notificationId: string): Promise<Notification> {
+export async function markAsRead(notificationId: string, userId: string): Promise<Notification> {
   const { rows } = await query<Notification>(
     `UPDATE notifications SET read_at = COALESCE(read_at, now())
-     WHERE id = $1
+     WHERE id = $1 AND user_id = $2
      RETURNING ${NOTIFICATION_COLUMNS}`,
-    [notificationId],
+    [notificationId, userId],
   );
   const notification = rows[0];
   if (!notification) throw notFound('Notification not found');

@@ -20,6 +20,6 @@ notificationsRouter.get('/', async (req, res) => {
 });
 
 notificationsRouter.post('/:notificationId/read', async (req, res) => {
-  const notification = await notificationsService.markAsRead(req.params.notificationId);
+  const notification = await notificationsService.markAsRead(req.params.notificationId, currentUser(req).id);
   res.json({ notification });
 });
