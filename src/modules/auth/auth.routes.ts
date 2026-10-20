@@ -26,3 +26,24 @@ authRouter.post('/login', async (req, res) => {
   const result = await authService.login(email, password);
   res.json(result);
 });
+
+const forgotPasswordSchema = z.object({
+  email: z.string().trim().email(),
+});
+
+const resetPasswordSchema = z.object({
+  token: z.string().min(1),
+  password: z.string().min(8).max(128),
+});
+
+authRouter.post('/forgot-password', async (req, res) => {
+  const { email } = forgotPasswordSchema.parse(req.body);
+  await authService.requestPasswordReset(email);
+  res.status(202).json({ message: 'If that account exists, a reset link has been sent' });
+});
+
+authRouter.post('/reset-password', async (req, res) => {
+  const { token, password } = resetPasswordSchema.parse(req.body);
+  await authService.resetPassword(token, password);
+  res.status(204).end();
+});

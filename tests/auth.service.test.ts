@@ -60,3 +60,43 @@ describe('auth.service', () => {
     ).rejects.toMatchObject({ status: 409 });
   });
 });
+
+describe('auth.service password reset', () => {
+  beforeEach(() => {
+    mockedQuery.mockReset();
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+  });
+
+  it('stores a reset token for a known email', async () => {
+    mockedQuery
+      .mockResolvedValueOnce({ rows: [{ id: user.id, email: user.email }] } as never)
+      .mockResolvedValueOnce({ rows: [] } as never);
+
+    await authService.requestPasswordReset(user.email);
+
+    const [sql, params] = mockedQuery.mock.calls[1]!;
+    expect(sql).toContain('INSERT INTO password_reset_tokens');
+    expect(params?.[0]).toBe(user.id);
+    expect(typeof params?.[1]).toBe('string');
+  });
+
+  it('rejects an unknown reset token', async () => {
+    mockedQuery.mockResolvedValueOnce({ rows: [] } as never);
+
+    await expect(authService.resetPassword('nope', 'new-password-123')).rejects.toMatchObject({ status: 400 });
+  });
+
+  it('updates the password hash and marks the token used', async () => {
+    mockedQuery
+      .mockResolvedValueOnce({
+        rows: [{ id: 'rt-1', user_id: user.id, token: 'abc', expires_at: new Date(Date.now() + 60_000) }],
+      } as never)
+      .mockResolvedValueOnce({ rows: [] } as never)
+      .mockResolvedValueOnce({ rows: [] } as never);
+
+    await authService.resetPassword('abc', 'new-password-123');
+
+    expect(mockedQuery.mock.calls[1]?.[0]).toContain('UPDATE users SET password_hash');
+    expect(mockedQuery.mock.calls[2]?.[1]).toEqual(['rt-1']);
+  });
+});

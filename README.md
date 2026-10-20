@@ -33,6 +33,8 @@ All endpoints except `/health` and `/auth/*` need an `Authorization: Bearer <tok
 | ------ | -------------------------------------- | --------------------------------- |
 | POST   | `/auth/register`                       | Create an account                 |
 | POST   | `/auth/login`                          | Exchange credentials for a JWT    |
+| POST   | `/auth/forgot-password`                | Email a password reset link       |
+| POST   | `/auth/reset-password`                 | Set a new password with a token   |
 | GET    | `/users/me`                            | Current user                      |
 | POST   | `/projects`                            | Create a project (you're owner)   |
 | GET    | `/projects`                            | Projects you belong to            |
